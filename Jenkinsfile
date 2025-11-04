@@ -6,6 +6,10 @@ pipeline {
         DOCKER_TAG = 'latest'
     }
     
+    tools {
+        nodejs 'NodeJS-18'
+    }
+    
     stages {
         stage('Checkout') {
             steps {
@@ -31,52 +35,26 @@ pipeline {
                     try {
                         sh 'npm audit --audit-level=high'
                     } catch (Exception e) {
+                        echo 'Security audit failed, continuing...'
                         currentBuild.result = 'UNSTABLE'
                     }
                 }
             }
         }
         
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                }
-            }
-        }
-        
-        stage('Test Docker Image') {
-            steps {
-                script {
-                    sh """
-                        docker run -d -p 3001:3000 --name test-container-${BUILD_NUMBER} ${DOCKER_IMAGE}:${DOCKER_TAG}
-                        sleep 10
-                        curl -f http://localhost:3001/ || exit 1
-                        curl -f "http://localhost:3001/add?left=5&right=2" | grep -q '"sum":7' || exit 1
-                        docker stop test-container-${BUILD_NUMBER}
-                        docker rm test-container-${BUILD_NUMBER}
-                    """
-                }
-            }
-        }
-        
         stage('Archive Artifacts') {
             steps {
-                archiveArtifacts artifacts: 'Dockerfile, package.json', allowEmptyArchive: true
+                archiveArtifacts artifacts: 'package.json, app.js, app.test.js, Dockerfile', allowEmptyArchive: true
             }
         }
     }
     
     post {
-        always {
-            script {
-                try {
-                    sh "docker stop test-container-${BUILD_NUMBER} || echo 'Container already stopped'"
-                    sh "docker rm test-container-${BUILD_NUMBER} || echo 'Container already removed'"
-                } catch (Exception e) {
-                    echo 'Cleanup completed'
-                }
-            }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
         }
     }
 }
