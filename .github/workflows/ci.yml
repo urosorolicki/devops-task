@@ -1,0 +1,80 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run tests
+      run: npm test
+    
+    - name: Security audit
+      run: npm audit --audit-level=high
+      continue-on-error: true
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      if: github.event_name != 'pull_request'
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+      continue-on-error: true
+    
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: sum-app:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Test Docker image
+      run: |
+        docker run -d -p 3000:3000 --name test-container sum-app:latest
+        sleep 10
+        curl -f http://localhost:3000/ || exit 1
+        curl -f "http://localhost:3000/add?left=5&right=2" | grep -q '"sum":7' || exit 1
+        docker stop test-container
+        docker rm test-container
+    
+    - name: Push to registry
+      uses: docker/build-push-action@v5
+      if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      with:
+        context: .
+        push: true
+        tags: sum-app:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+      continue-on-error: true

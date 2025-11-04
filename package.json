@@ -1,0 +1,26 @@
+{
+  "name": "sum-app",
+  "version": "1.0.0",
+  "description": "A simple web application that adds two numbers",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "dev": "node app.js"
+  },
+  "keywords": ["express", "nodejs", "devops", "api"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/__tests__/**/*.js", "**/?(*.)+(spec|test).js"]
+  }
+}
